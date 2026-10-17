@@ -28,6 +28,8 @@ device keeps its data and the next sync at home sends it.
    sh kobo-device/build-koboroot.sh ~/Downloads/NickelMenu/KoboRoot.tgz /tmp/KoboRoot.tgz
    ```
 
+   If NickelMenu is already installed, pass `none` instead of its archive.
+
 2. With the Kobo connected over USB (`/Volumes/KOBOeReader` on macOS):
 
    ```sh

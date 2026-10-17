@@ -4,6 +4,7 @@
 # have to be in the same archive.
 #
 #   sh build-koboroot.sh path/to/NickelMenu/KoboRoot.tgz out/KoboRoot.tgz
+#   sh build-koboroot.sh none out/KoboRoot.tgz   # NickelMenu already installed
 #
 # Nickel extracts the archive over /, so it must hold file entries only, like
 # the NickelMenu release does: a directory entry would reset that directory's
@@ -19,7 +20,9 @@ here=$(cd "$(dirname "$0")" && pwd)
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT
 
-tar -xzf "$nickelmenu" -C "$stage"
+if [ "$nickelmenu" != none ]; then
+    tar -xzf "$nickelmenu" -C "$stage"
+fi
 install -d "$stage/etc/udev/rules.d" "$stage/usr/local/cwa"
 install -m 0644 "$here/99-cwa-reading-data.rules" "$stage/etc/udev/rules.d/"
 install -m 0755 "$here/watch.sh" "$here/watch-start.sh" "$stage/usr/local/cwa/"
