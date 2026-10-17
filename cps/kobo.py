@@ -1667,3 +1667,39 @@ def NATIVE_KOBO_RESOURCES():
         "userguide_host": "https://ereaderfiles.kobo.com",
         "wishlist_page": "https://www.kobo.com/{region}/{language}/account/wishlist"
     }
+
+
+def resolve_reading_data_user_id():
+    """Map a device request to a CWA user for kobo_reading_data.
+
+    Requests under /kobo/<auth_token>/ are logged in by requires_kobo_auth.
+    Reading-services calls (/api/v3/...) carry Kobo's bearer token instead, so
+    they can only be attributed when exactly one user has a Kobo sync token.
+    """
+    if current_user.is_authenticated and not current_user.is_anonymous:
+        return current_user.id
+    user_ids = {
+        row.user_id
+        for row in ub.session.query(ub.RemoteAuthToken.user_id).filter(ub.RemoteAuthToken.token_type == 1)
+    }
+    return user_ids.pop() if len(user_ids) == 1 else None
+
+
+@csrf.exempt
+@kobo.route("/v1/cwa/device-db", methods=["POST"])
+@requires_kobo_auth
+def HandleDeviceDatabaseUpload():
+    from . import kobo_reading_data
+
+    if (request.content_length or 0) > kobo_reading_data.MAX_UPLOAD_BYTES:
+        abort(413)
+    conn = kobo_reading_data.connect(os.environ.get("CWA_KOBO_READING_DB", kobo_reading_data.DEFAULT_DB_PATH))
+    try:
+        counts = kobo_reading_data.ingest_device_upload(conn, current_user.id, request.get_data())
+    except ValueError as e:
+        log.warning("Rejected Kobo device database upload: %s", e)
+        return make_response(jsonify({"error": str(e)}), 400)
+    finally:
+        conn.close()
+    log.info("Imported Kobo device database: %s", counts)
+    return jsonify(counts)

@@ -92,6 +92,10 @@ def main():
         from . import kobo_capture
         if kobo_capture.capture_enabled():
             app.after_request(kobo_capture.make_after_request_hook())
+        from . import kobo_reading_data
+        if kobo_reading_data.reading_data_enabled():
+            from .kobo import resolve_reading_data_user_id
+            app.after_request(kobo_reading_data.make_ingest_hook(resolve_reading_data_user_id))
     if oauth_available:
         app.register_blueprint(oauth)
     success = web_server.start()
