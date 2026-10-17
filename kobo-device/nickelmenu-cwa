@@ -1,0 +1,2 @@
+menu_item :main :Reading data status :cmd_output :500:cat /mnt/onboard/.adds/cwa/last_upload.txt
+menu_item :main :CWA device probe    :cmd_output :9000:/bin/sh /mnt/onboard/.adds/cwa/probe.sh

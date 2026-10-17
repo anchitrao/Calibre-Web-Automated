@@ -201,6 +201,54 @@ class TestDeviceUpload:
         assert row["chapter_title"] == "Prologue"
         assert row["chapter_filename"] == "OEBPS/c001.htm"
 
+    def test_sync_copy_wins_a_timestamp_tie(self, conn):
+        reading.ingest_annotations_patch(conn, 1, BOOK, {"updatedAnnotations": [
+            _annotation("a1", "2026-10-17T05:42:47Z", text="from sync")]})
+        reading.upsert_annotation(conn, 1, {
+            "id": "a1", "book_uuid": BOOK, "type": "highlight", "highlighted_text": "from device",
+            "note_text": None, "highlight_color": None, "chapter_title": None, "chapter_filename": None,
+            "chapter_progress": None, "start_path": None, "start_char": None, "end_path": None,
+            "end_char": None, "client_modified": "2026-10-17T05:42:47.000",
+        }, source="device")
+        row = _annotations(conn)["a1"]
+        assert (row["highlighted_text"], row["source"]) == ("from sync", "sync")
+
+    def test_later_device_edit_within_the_same_second_wins(self, conn):
+        reading.ingest_annotations_patch(conn, 1, BOOK, {"updatedAnnotations": [
+            _annotation("a1", "2026-10-17T05:42:47Z", note="old")]})
+        reading.upsert_annotation(conn, 1, {
+            "id": "a1", "book_uuid": BOOK, "type": "note", "highlighted_text": "A passage.",
+            "note_text": "edited", "highlight_color": None, "chapter_title": None, "chapter_filename": None,
+            "chapter_progress": None, "start_path": None, "start_char": None, "end_path": None,
+            "end_char": None, "client_modified": "2026-10-17T05:42:47.806",
+        }, source="device")
+        row = _annotations(conn)["a1"]
+        assert row["note_text"] == "edited"
+        assert row["chapter_title"] == "Prologue"
+
+    def test_connect_normalizes_rows_from_before_normalization(self, tmp_path):
+        db_path = str(tmp_path / "old.db")
+        conn = reading.connect(db_path)
+        conn.execute(
+            "INSERT INTO annotation (id, user_id, client_modified, source, updated_at)"
+            " VALUES ('a1', 1, '2026-10-17T05:42:47Z', 'sync', 'x')"
+        )
+        conn.commit()
+        conn.close()
+        conn = reading.connect(db_path)
+        assert conn.execute("SELECT client_modified FROM annotation").fetchone()[0] == \
+            "2026-10-17T05:42:47.000000+00:00"
+
+    @pytest.mark.parametrize("value,expected", [
+        ("2026-10-17T05:42:47Z", "2026-10-17T05:42:47.000000+00:00"),
+        ("2026-10-17T05:42:47.806", "2026-10-17T05:42:47.806000+00:00"),
+        ("2026-10-17T07:42:47+02:00", "2026-10-17T05:42:47.000000+00:00"),
+        ("garbage", "garbage"),
+        (None, None),
+    ])
+    def test_normalize_timestamp(self, value, expected):
+        assert reading.normalize_timestamp(value) == expected
+
     def test_hidden_bookmarks_are_skipped(self, conn, tmp_path):
         _device_db(tmp_path / "KoboReader.sqlite", hidden=True)
         reading.ingest_device_upload(conn, 1, (tmp_path / "KoboReader.sqlite").read_bytes())

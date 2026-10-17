@@ -116,6 +116,24 @@ def _now():
     return datetime.now(timezone.utc).isoformat()
 
 
+def normalize_timestamp(value):
+    """Return value as UTC ISO-8601 with microseconds, so timestamps sort as text.
+
+    Sync payloads use second precision with a Z suffix ("...:11Z") while the
+    device database uses naive milliseconds ("...:11.806"); compared raw, '.'
+    sorts before 'Z' and the later edit would lose. Naive values are UTC.
+    """
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return value
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).isoformat(timespec="microseconds")
+
+
 def reading_data_enabled(environ=None):
     value = (environ if environ is not None else os.environ).get("CWA_KOBO_READING_DATA", "")
     return value.strip().lower() in ("1", "true", "yes", "on")
@@ -126,14 +144,22 @@ def connect(db_path):
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.executescript(_SCHEMA)
+    # Rows written before timestamps were normalized must be brought into the
+    # same form, or a raw "...Z" value would compare as newer than any update.
+    conn.create_function("cwa_normalize_timestamp", 1, normalize_timestamp, deterministic=True)
+    with conn:
+        conn.execute(
+            "UPDATE annotation SET client_modified = cwa_normalize_timestamp(client_modified)"
+            " WHERE client_modified IS NOT NULL AND client_modified NOT LIKE '%+00:00'"
+        )
     return conn
 
 
 def upsert_annotation(conn, user_id, row, source):
     """Insert or update one annotation, keeping whichever copy was edited last.
 
-    client_modified is compared as an ISO-8601 string; both sources emit UTC
-    with a trailing Z or fractional seconds, which sort correctly as text.
+    On a tie the sync copy wins, since it carries the chapter title and file that
+    the device database lacks; coalesce() keeps those fields either way.
     """
     conn.execute(
         """
@@ -161,9 +187,11 @@ def upsert_annotation(conn, user_id, row, source):
             source = excluded.source,
             updated_at = excluded.updated_at
         WHERE annotation.client_modified IS NULL
-           OR excluded.client_modified >= annotation.client_modified
+           OR excluded.client_modified > annotation.client_modified
+           OR (excluded.client_modified = annotation.client_modified AND excluded.source = 'sync')
         """,
-        {**row, "user_id": user_id, "source": source, "updated_at": _now()},
+        {**row, "client_modified": normalize_timestamp(row["client_modified"]),
+         "user_id": user_id, "source": source, "updated_at": _now()},
     )
 
 
