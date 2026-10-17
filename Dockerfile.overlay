@@ -1,0 +1,14 @@
+# Fork overlay: layers this branch's Python sources onto a released upstream
+# image instead of rebuilding Calibre and the rest of the toolchain.
+#
+# Only valid while the fork's changes are confined to cps/ and scripts/. Keep
+# BASE_IMAGE on the upstream tag this branch is rebased onto; a mismatch ships
+# newer Python against older bundled dependencies.
+#
+#   docker build -f Dockerfile.overlay -t cwa-fork:local .
+
+ARG BASE_IMAGE=crocodilestick/calibre-web-automated:v4.0.8
+FROM ${BASE_IMAGE}
+
+COPY --chown=abc:abc cps/ /app/calibre-web-automated/cps/
+COPY --chown=abc:abc scripts/ /app/calibre-web-automated/scripts/
