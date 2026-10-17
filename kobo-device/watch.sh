@@ -20,18 +20,35 @@ SETTLE_SECONDS=${CWA_SETTLE_SECONDS:-30}
 # Creating this file on the USB partition turns the watcher off without having
 # to remove anything from the root filesystem.
 DISABLED=${CWA_DISABLED:-/mnt/onboard/.adds/cwa/disabled}
+LOG=${CWA_WATCH_LOG:-/mnt/onboard/.adds/cwa/watch.log}
+
+log() {
+    # The USB partition may not be mounted yet at boot, or may be away on USB.
+    [ -d "${LOG%/*}" ] || return 0
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [$$] $1" >> "$LOG"
+    # Keep the log to its last 200 lines; it only needs to answer "is it running".
+    if [ "$(wc -l < "$LOG")" -gt 400 ]; then
+        tail -n 200 "$LOG" > "$LOG.tmp" && mv "$LOG.tmp" "$LOG"
+    fi
+}
 
 mkdir "$LOCK" 2>/dev/null || exit 0
 echo $$ > "$LOCK/pid"
+started=""
 
 last=""
 while :; do
     sleep "$POLL_SECONDS"
     if [ -f "$DISABLED" ]; then
+        log "stopping: $DISABLED exists"
         rm -rf "$LOCK"
         exit 0
     fi
     [ -f "$CONF" ] || continue
+    if [ -z "$started" ]; then
+        started=1
+        log "watching LastSync"
+    fi
     current=$(sed -n 's/^LastSync=//p' "$CONF" | head -n 1)
     [ -n "$current" ] || continue
     if [ -z "$last" ]; then
@@ -40,6 +57,7 @@ while :; do
     fi
     if [ "$current" != "$last" ]; then
         last=$current
+        log "sync seen (LastSync=$current), uploading"
         sleep "$SETTLE_SECONDS"
         [ -f "$UPLOAD" ] && /bin/sh "$UPLOAD"
     fi

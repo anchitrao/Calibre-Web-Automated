@@ -1,2 +1,3 @@
-menu_item :main :Reading data status :cmd_output :500:cat /mnt/onboard/.adds/cwa/last_upload.txt
-menu_item :main :CWA device probe    :cmd_output :9000:/bin/sh /mnt/onboard/.adds/cwa/probe.sh
+menu_item :main :Reading data status         :cmd_output :500:cat /mnt/onboard/.adds/cwa/last_upload.txt 2>/dev/null || echo "No upload yet. Last watcher lines:"; tail -n 3 /mnt/onboard/.adds/cwa/watch.log 2>/dev/null || echo "(watcher has not logged anything)"
+menu_item :main :Start reading-data watcher  :cmd_output :500:/bin/sh /usr/local/cwa/watch-start.sh && echo "Watcher started (no-op if already running)."
+menu_item :main :CWA device probe            :cmd_output :9000:/bin/sh /mnt/onboard/.adds/cwa/probe.sh
