@@ -51,6 +51,7 @@ class TestCapturePaths:
     @pytest.mark.parametrize("path", [
         "/kobo/abc123/download/12/kepub",
         "/kobo/abc123/0f1e/150/200/false/image.jpg",
+        "/kobo/abc123/v1/cwa/device-db",
         "/login",
         "/api/books",
         "/kosync/users/auth",

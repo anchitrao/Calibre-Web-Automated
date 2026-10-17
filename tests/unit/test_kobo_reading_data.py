@@ -161,7 +161,9 @@ def _device_db(path, *, hidden=False):
             EndOffset INTEGER, DateCreated TEXT, DateModified TEXT, Hidden TEXT);
     """)
     db.execute("INSERT INTO WordList VALUES ('programme', ?, '-en', '2026-10-17T05:35:19Z')", (BOOK,))
-    db.execute("INSERT INTO Event VALUES (46, '2024-01-03', '2026-10-17', 12, ?, X'0102', NULL)", (BOOK,))
+    # Stored the way the device does it: non-UTF-8 bytes in a TEXT value.
+    db.execute("INSERT INTO Event VALUES (46, '2024-01-03', '2026-10-17', 12, ?, CAST(X'ff0102' AS TEXT), NULL)",
+               (BOOK,))
     db.execute(
         "INSERT INTO Bookmark VALUES ('a1', ?, 'A passage.', '', 'highlight', 0.5, 'span#kobo\\.19\\.1', 0,"
         " 'span#kobo\\.19\\.5', 151, '2026-10-17T05:42:47.000', NULL, ?)",
@@ -185,7 +187,7 @@ class TestDeviceUpload:
         word = conn.execute("SELECT * FROM word").fetchone()
         assert (word["text"], word["volume_id"]) == ("programme", BOOK)
         event = conn.execute("SELECT * FROM event_counter").fetchone()
-        assert (event["event_type"], event["event_count"], event["extra_data"]) == (46, 12, b"\x01\x02")
+        assert (event["event_type"], event["event_count"], event["extra_data"]) == (46, 12, b"\xff\x01\x02")
         usb = _annotations(conn)["usb1"]
         assert (usb["book_uuid"], usb["note_text"], usb["source"]) == (
             "file:///mnt/onboard/book.epub", "mine", "device")

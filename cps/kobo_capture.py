@@ -37,8 +37,9 @@ MAX_RESPONSE_BODY = 256 * 1024
 # to scheme+host, so those calls land at the site root under /api/.
 _KOBO_PREFIX = re.compile(r"^/kobo/[^/]+")
 _ROOT_PREFIXES = ("/api/v3/", "/api/UserStorage/", "/api/internal/")
-# Book files and covers are binary and already reproducible from the library.
-_SKIP = re.compile(r"^/kobo/[^/]+/(download/|.*\.jpg$)")
+# Book files and covers are binary and already reproducible from the library;
+# device database uploads are stored structurally by kobo_reading_data.
+_SKIP = re.compile(r"^/kobo/[^/]+/(download/|v1/cwa/device-db$|.*\.jpg$)")
 
 _HEADER_ALLOW = {"user-agent", "content-type", "content-encoding", "accept-encoding"}
 # x-kobo-userkey identifies the Kobo account; everything else under x-kobo- is

@@ -306,8 +306,11 @@ def ingest_device_database(conn, user_id, device_db_path):
                     )
                     counts["words"] += 1
             if "Event" in tables:
+                # The device writes binary ExtraData with TEXT affinity, which the
+                # sqlite3 module would otherwise try (and fail) to decode as UTF-8.
                 for r in device.execute(
-                    "SELECT EventType, FirstOccurrence, LastOccurrence, EventCount, ContentID, ExtraData FROM Event"
+                    "SELECT EventType, FirstOccurrence, LastOccurrence, EventCount, ContentID,"
+                    " CAST(ExtraData AS BLOB) AS ExtraData FROM Event"
                 ):
                     conn.execute(
                         "INSERT OR REPLACE INTO event_counter (user_id, content_id, event_type, first_occurrence,"
